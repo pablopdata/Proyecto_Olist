@@ -3,6 +3,7 @@ import numpy as np
 import seaborn as sns
 import streamlit as st
 import matplotlib.pyplot as plt
+import altair as alt
 
 
 #Leemos los dos archivos CSV para los dos primeros ejercicios
@@ -38,7 +39,23 @@ st.subheader("Estados con más clientes en el rango de fechas seleccionado")
 
 #Gráfico streamlit con los 5 estados con mas clientes en un rango de fechas variable
 
-st.bar_chart(top_estados)
+top_estados_df = top_estados.reset_index()
+top_estados_df.columns = ['customer_state', 'num_clientes']
+
+# Gráfico con Altair ordenado de mayor a menor
+chart_estados = alt.Chart(top_estados_df).mark_bar(color='orange').encode(
+    x=alt.X('num_clientes:Q', title='Número de Clientes'),
+    y=alt.Y('customer_state:N', sort='-x', title='Estado'),
+    tooltip=['customer_state', 'num_clientes']
+).properties(
+    title='Top 5 Estados con Más Clientes en el Rango Seleccionado',
+    width=700,
+    height=300
+)
+
+st.altair_chart(chart_estados, use_container_width=True)
+
+#================================================
 
 tabla = df_filtrado.groupby(["customer_state", "customer_city"])["customer_id"].nunique().reset_index(name="num_clientes")
 tabla2 = df_final.groupby('customer_city')['order_id'].count().reset_index(name='num_pedidos_ciudad')
@@ -47,6 +64,7 @@ tabla2['numero de pedidos y %'] = tabla2['num_pedidos_ciudad'].apply(
     lambda x: f"{x} pedidos ({(x / total2 * 100):.1f}%)"
 )
 tabla_completa = pd.merge(tabla, tabla2, on='customer_city')
+tabla_completa['ratio_pedidos_por_cliente'] = tabla_completa['num_pedidos_ciudad'] / tabla_completa['num_clientes']
 tabla_completa = tabla_completa.sort_values(by="num_clientes", ascending=False)
 tabla_completa.pop('num_pedidos_ciudad')
 st.subheader("Clientes por estado y ciudad")
@@ -60,17 +78,19 @@ st.title("Distribución de Pedidos por Ciudad")
 # Ordenar por cantidad de pedidos y seleccionar las top N
 top_n = st.slider('Selecciona cuántas ciudades mostrar (Top N)', min_value=3, max_value=20, value=10)
 
+# Ordenar y seleccionar top N
+
 tabla_top = tabla_completa.sort_values(by='num_clientes', ascending=False).head(top_n)
 
-# Gráfico de pastel
-fig, ax = plt.subplots()
-ax.pie(
-    tabla_top['num_clientes'],
-    labels=tabla_top['customer_city'],
-    autopct='%1.1f%%',
-    startangle=140
-)
-ax.axis('equal')  # Mantiene el círculo
-plt.title(f'Distribución porcentual de pedidos por ciudad (Top {top_n})')
+# Crear gráfico con Altair
+chart = alt.Chart(tabla_top).mark_bar(color='#B2F2BB').encode(
+        x=alt.X('num_clientes:Q', title='Número de Clientes'),
+        y=alt.Y('customer_city:N', sort='-x', title='Ciudad'),
+        tooltip=['customer_city', 'num_clientes']
+    ).properties(
+        title=f'Top {top_n} Ciudades con Más Clientes',
+        width=700,
+        height=400
+    )
 
-st.pyplot(fig)
+st.altair_chart(chart, use_container_width=True)
